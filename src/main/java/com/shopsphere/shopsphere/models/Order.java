@@ -19,8 +19,7 @@ import java.util.UUID;
 @Builder
 public class Order {
     @Id
-    @GeneratedValue(generator = "UUID")
-    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "order_id", updatable = false, nullable = false)
     private UUID orderId;
 

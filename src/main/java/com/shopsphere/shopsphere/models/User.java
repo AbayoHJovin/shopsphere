@@ -37,10 +37,6 @@ public class User {
     @Column(length = 10)
     private String otp;
 
-    private String resetToken;
-
-    private LocalDateTime resetTokenExpiry;
-
     @CreationTimestamp
     private LocalDateTime createdAt;
 
@@ -59,4 +55,11 @@ public class User {
     @OneToMany(mappedBy = "orderer", cascade = CascadeType.ALL)
     @Builder.Default
     private List<Order> orders = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<RefreshToken> refreshTokens = new ArrayList<>();
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private ResetPasswordToken resetPasswordToken;
 }

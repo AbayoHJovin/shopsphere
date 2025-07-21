@@ -2,7 +2,6 @@ package com.shopsphere.shopsphere.models;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.GenericGenerator;
 
 import java.util.UUID;
 
@@ -14,8 +13,7 @@ import java.util.UUID;
 @Builder
 public class ProductImage {
     @Id
-    @GeneratedValue(generator = "UUID")
-    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "image_id", updatable = false, nullable = false)
     private UUID imageId;
 
