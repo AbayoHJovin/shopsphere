@@ -4,6 +4,7 @@ import com.shopsphere.shopsphere.dto.request.OrderCreateRequest;
 import com.shopsphere.shopsphere.dto.request.OrderFilterRequest;
 import com.shopsphere.shopsphere.dto.request.OrderProveDeliveryRequest;
 import com.shopsphere.shopsphere.dto.request.OrderStatusUpdateRequest;
+import com.shopsphere.shopsphere.dto.request.QrScanRequest;
 import com.shopsphere.shopsphere.dto.response.OrderResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -44,4 +45,7 @@ public interface OrderService {
 
     // Filter orders
     Page<OrderResponse> filterOrders(OrderFilterRequest filterRequest, String userEmail, Pageable pageable);
+    
+    // QR code scan verification (admin/co-worker)
+    OrderResponse verifyQrCodeAndDeliver(QrScanRequest request, String userEmail);
 }

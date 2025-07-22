@@ -34,7 +34,7 @@ public class OrderResponse {
     private BigDecimal taxAmount;
     private BigDecimal discountAmount;
     
-    private boolean hasUserProven;
+    private boolean isQrScanned;
     
     // Customer information
     private UserSummaryResponse user; // Null for guest orders

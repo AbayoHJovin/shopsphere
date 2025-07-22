@@ -32,8 +32,8 @@ public class OrderFilterRequest {
     private String stateProvince;
     private String country;
 
-    // Delivery proof filter
-    private Boolean hasUserProven;
+    // QR scan status filter
+    private Boolean isQrScanned;
 
     // Customer filter
     private String customerEmail;

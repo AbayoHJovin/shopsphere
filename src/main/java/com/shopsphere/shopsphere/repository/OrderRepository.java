@@ -27,7 +27,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     
     List<Order> findByOrderDateBetween(LocalDateTime startDate, LocalDateTime endDate);
     
-    List<Order> findByHasUserProven(boolean hasUserProven);
+    List<Order> findByIsQrScanned(boolean isQrScanned);
     
     Page<Order> findByOrderStatus(OrderStatus orderStatus, Pageable pageable);
 }

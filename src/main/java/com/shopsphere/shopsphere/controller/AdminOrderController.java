@@ -2,6 +2,7 @@ package com.shopsphere.shopsphere.controller;
 
 import com.shopsphere.shopsphere.dto.request.OrderFilterRequest;
 import com.shopsphere.shopsphere.dto.request.OrderStatusUpdateRequest;
+import com.shopsphere.shopsphere.dto.request.QrScanRequest;
 import com.shopsphere.shopsphere.dto.response.ErrorResponse;
 import com.shopsphere.shopsphere.dto.response.OrderResponse;
 import com.shopsphere.shopsphere.exception.ResourceNotFoundException;
@@ -16,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -115,6 +117,44 @@ public class AdminOrderController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ErrorResponse.of(HttpStatus.INTERNAL_SERVER_ERROR,
                             "Error updating order status: " + e.getMessage(),
+                            servletRequest.getRequestURI()));
+        }
+    }
+    
+    @PostMapping("/scan-qr")
+    public ResponseEntity<?> scanQrCode(
+            @Valid @RequestBody QrScanRequest request,
+            Authentication authentication,
+            HttpServletRequest servletRequest) {
+        try {
+            log.info("Admin/Co-worker: Scanning QR code to verify and deliver order");
+            String userEmail = authentication.getName();
+            
+            OrderResponse response = orderService.verifyQrCodeAndDeliver(request, userEmail);
+            return ResponseEntity.ok(response);
+        } catch (ResourceNotFoundException e) {
+            log.error("Order not found or QR code invalid", e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ErrorResponse.of(HttpStatus.NOT_FOUND,
+                            e.getMessage(),
+                            servletRequest.getRequestURI()));
+        } catch (IllegalStateException e) {
+            log.error("Invalid state", e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ErrorResponse.of(HttpStatus.BAD_REQUEST,
+                            e.getMessage(),
+                            servletRequest.getRequestURI()));
+        } catch (AccessDeniedException e) {
+            log.error("Access denied", e);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ErrorResponse.of(HttpStatus.FORBIDDEN,
+                            e.getMessage(),
+                            servletRequest.getRequestURI()));
+        } catch (Exception e) {
+            log.error("Error scanning QR code", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ErrorResponse.of(HttpStatus.INTERNAL_SERVER_ERROR,
+                            "Error scanning QR code: " + e.getMessage(),
                             servletRequest.getRequestURI()));
         }
     }

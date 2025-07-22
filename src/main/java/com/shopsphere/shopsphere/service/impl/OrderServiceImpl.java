@@ -5,6 +5,7 @@ import com.shopsphere.shopsphere.dto.request.OrderFilterRequest;
 import com.shopsphere.shopsphere.dto.request.OrderItemRequest;
 import com.shopsphere.shopsphere.dto.request.OrderProveDeliveryRequest;
 import com.shopsphere.shopsphere.dto.request.OrderStatusUpdateRequest;
+import com.shopsphere.shopsphere.dto.request.QrScanRequest;
 import com.shopsphere.shopsphere.dto.response.OrderItemResponse;
 import com.shopsphere.shopsphere.dto.response.OrderResponse;
 import com.shopsphere.shopsphere.dto.response.OrderTransactionResponse;
@@ -77,6 +78,10 @@ public class OrderServiceImpl implements OrderService {
         // Create order
         Order order = buildOrderFromRequest(request, user);
         
+        // Generate unique order code
+        String uniqueOrderCode = UUID.randomUUID().toString();
+        order.setOrderCode(passwordEncoder.encode(uniqueOrderCode));
+        
         // Save order to get ID
         Order savedOrder = orderRepository.save(order);
         
@@ -93,7 +98,11 @@ public class OrderServiceImpl implements OrderService {
         Order refreshedOrder = orderRepository.findById(savedOrder.getOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
         
-        return mapOrderToResponse(refreshedOrder, true);
+        // Return the unhashed order code to the frontend
+        OrderResponse response = mapOrderToResponse(refreshedOrder, true);
+        response.setOrderCode(uniqueOrderCode); // Send unhashed code for QR generation
+        
+        return response;
     }
 
     @Override
@@ -101,21 +110,14 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse createGuestOrder(OrderCreateRequest request) {
         log.info("Creating guest order");
         
-        // Validate order code
-        if (request.getOrderCode() == null || request.getOrderCode().trim().isEmpty()) {
-            throw new IllegalArgumentException("Order code is required for guest orders");
-        }
-        
-        // Check if order code already exists
-        if (orderRepository.existsByOrderCode(request.getOrderCode())) {
-            throw new IllegalArgumentException("Order code already exists. Please choose a different one.");
-        }
+        // Generate unique order code
+        String uniqueOrderCode = UUID.randomUUID().toString();
         
         // Create order without user
         Order order = buildOrderFromRequest(request, null);
         
-        // Hash the order code for security
-        order.setOrderCode(passwordEncoder.encode(request.getOrderCode()));
+        // Store hashed code in the database
+        order.setOrderCode(passwordEncoder.encode(uniqueOrderCode));
         
         // Save order to get ID
         Order savedOrder = orderRepository.save(order);
@@ -133,7 +135,11 @@ public class OrderServiceImpl implements OrderService {
         Order refreshedOrder = orderRepository.findById(savedOrder.getOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
         
-        return mapOrderToResponse(refreshedOrder, false);
+        // Return the unhashed order code to the frontend
+        OrderResponse response = mapOrderToResponse(refreshedOrder, true);
+        response.setOrderCode(uniqueOrderCode); // Send unhashed code for QR generation
+        
+        return response;
     }
 
     @Override
@@ -162,11 +168,13 @@ public class OrderServiceImpl implements OrderService {
         log.info("Fetching order with code: {}", orderCode);
         
         // Find orders and check if the provided code matches
-        List<Order> guestOrders = orderRepository.findByUserIsNull();
+        List<Order> orders = orderRepository.findAll();
         
-        for (Order order : guestOrders) {
+        for (Order order : orders) {
             if (passwordEncoder.matches(orderCode, order.getOrderCode())) {
-                return mapOrderToResponse(order, true);
+                OrderResponse response = mapOrderToResponse(order, true);
+                response.setOrderCode(orderCode); // Send unhashed code for QR display/regeneration
+                return response;
             }
         }
         
@@ -202,9 +210,9 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
         
-        // Check if order is already proven as delivered
-        if (order.getOrderStatus() == OrderStatus.PROVEN_DELIVERED) {
-            throw new IllegalStateException("Cannot change status of an order that has been proven delivered");
+        // Check if order is already delivered (after QR scan)
+        if (order.isQrScanned() && order.getOrderStatus() == OrderStatus.DELIVERED) {
+            throw new IllegalStateException("Cannot change status of an order that has been delivered via QR scan");
         }
         
         // Check if trying to set to DELIVERED with pending payment
@@ -271,6 +279,9 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse proveDelivery(UUID orderId, String userEmail) {
         log.info("Proving delivery for order with ID: {} by user: {}", orderId, userEmail);
         
+        // This method is deprecated as we're now using QR code scanning
+        // But keeping for backward compatibility
+        
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
         
@@ -289,13 +300,7 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalStateException("Order must be in DELIVERED status to be proven");
         }
         
-        order.setOrderStatus(OrderStatus.PROVEN_DELIVERED);
-        order.setHasUserProven(true);
-        order.setUpdatedAt(LocalDateTime.now());
-        
-        Order updatedOrder = orderRepository.save(order);
-        
-        return mapOrderToResponse(updatedOrder, true);
+        throw new IllegalStateException("This method is deprecated. Orders are now verified using QR code scanning");
     }
 
     @Override
@@ -303,11 +308,30 @@ public class OrderServiceImpl implements OrderService {
     public OrderResponse proveDeliveryByCode(OrderProveDeliveryRequest request) {
         log.info("Proving delivery for order with code: {}", request.getOrderCode());
         
-        // Find orders and check if the provided code matches
-        List<Order> guestOrders = orderRepository.findByUserIsNull();
+        // This method is deprecated as we're now using QR code scanning
+        // But keeping for backward compatibility
+        
+        throw new IllegalStateException("This method is deprecated. Orders are now verified using QR code scanning");
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse verifyQrCodeAndDeliver(QrScanRequest request, String userEmail) {
+        log.info("Verifying QR code: {}", request.getOrderCode());
+        
+        // Validate the admin/co-worker user
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        
+        if (user.getRole() != Role.ADMIN && user.getRole() != Role.CO_WORKER) {
+            throw new AccessDeniedException("Only admins and co-workers can scan QR codes");
+        }
+        
+        // Find the order by matching the code
+        List<Order> orders = orderRepository.findAll();
         Order matchedOrder = null;
         
-        for (Order order : guestOrders) {
+        for (Order order : orders) {
             if (passwordEncoder.matches(request.getOrderCode(), order.getOrderCode())) {
                 matchedOrder = order;
                 break;
@@ -315,26 +339,28 @@ public class OrderServiceImpl implements OrderService {
         }
         
         if (matchedOrder == null) {
-            throw new ResourceNotFoundException("Order not found or code is incorrect");
+            throw new ResourceNotFoundException("Order not found or QR code is invalid");
         }
         
-        // Check if order status is DELIVERED
-        if (matchedOrder.getOrderStatus() != OrderStatus.DELIVERED) {
-            throw new IllegalStateException("Order must be in DELIVERED status to be proven");
+        // Check if order has already been scanned
+        if (matchedOrder.isQrScanned()) {
+            throw new IllegalStateException("This QR code has already been scanned");
         }
         
-        matchedOrder.setOrderStatus(OrderStatus.PROVEN_DELIVERED);
-        matchedOrder.setHasUserProven(true);
-        
-        if (request.getFeedback() != null && !request.getFeedback().trim().isEmpty()) {
-            matchedOrder.setNotes(matchedOrder.getNotes() + "\nDelivery Feedback: " + request.getFeedback());
+        // Check payment status
+        if (matchedOrder.getPaymentStatus() != OrderPaymentStatus.PAID) {
+            throw new IllegalStateException("Cannot deliver an order that hasn't been paid");
         }
         
+        // Update the order
+        matchedOrder.setQrScanned(true);
+        matchedOrder.setOrderStatus(OrderStatus.DELIVERED);
         matchedOrder.setUpdatedAt(LocalDateTime.now());
         
         Order updatedOrder = orderRepository.save(matchedOrder);
         
-        return mapOrderToResponse(updatedOrder, true);
+        // Return response without the raw order code
+        return mapOrderToResponse(updatedOrder, false);
     }
 
     @Override
@@ -394,9 +420,9 @@ public class OrderServiceImpl implements OrderService {
             }
         }
         
-        // Delivery proof filter
-        if (filterRequest.getHasUserProven() != null) {
-            predicates.add(cb.equal(orderRoot.get("hasUserProven"), filterRequest.getHasUserProven()));
+        // QR scan filter
+        if (filterRequest.getIsQrScanned() != null) {
+            predicates.add(cb.equal(orderRoot.get("isQrScanned"), filterRequest.getIsQrScanned()));
         }
         
         // Order code filter (admin only)
@@ -457,7 +483,7 @@ public class OrderServiceImpl implements OrderService {
                 .orderStatus(OrderStatus.PENDING)
                 .paymentStatus(OrderPaymentStatus.PENDING)
                 .totalAmount(request.getTotalAmount())
-                .hasUserProven(false)
+                .isQrScanned(false)
                 .orderDate(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -584,7 +610,7 @@ public class OrderServiceImpl implements OrderService {
                 .shippingCost(order.getShippingCost())
                 .taxAmount(order.getTaxAmount())
                 .discountAmount(order.getDiscountAmount())
-                .hasUserProven(order.isHasUserProven())
+                .isQrScanned(order.isQrScanned())
                 .user(userResponse)
                 .email(order.getEmail())
                 .firstName(order.getFirstName())

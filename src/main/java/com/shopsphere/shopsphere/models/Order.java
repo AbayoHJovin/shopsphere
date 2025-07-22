@@ -58,7 +58,8 @@ public class Order {
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
     @Column(nullable = false)
-    private boolean hasUserProven;
+    @Builder.Default
+    private boolean isQrScanned = false;
 
     // Customer information
     @ManyToOne
