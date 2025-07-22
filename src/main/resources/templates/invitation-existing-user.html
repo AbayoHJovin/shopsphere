@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ShopSphere Role Update</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .header {
+        background-color: #4a90e2;
+        color: white;
+        padding: 20px;
+        text-align: center;
+        border-radius: 5px 5px 0 0;
+      }
+      .content {
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-top: none;
+        border-radius: 0 0 5px 5px;
+      }
+      .button {
+        display: inline-block;
+        background-color: #4a90e2;
+        color: white;
+        text-decoration: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        margin: 20px 0;
+      }
+      .footer {
+        margin-top: 20px;
+        font-size: 12px;
+        color: #777;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Role Update at ShopSphere</h1>
+    </div>
+    <div class="content">
+      <p>Hello,</p>
+      <p>
+        Your role at ShopSphere has been updated to
+        <strong th:text="${role}">role</strong> by
+        <strong th:text="${inviterName}">inviter</strong>.
+      </p>
+      <p>To access your new privileges, please log in to your account:</p>
+
+      <a class="button" th:href="${invitationLink}">Log In to ShopSphere</a>
+
+      <p>
+        This invitation will expire on
+        <span th:text="${#temporals.format(expiryDate, 'dd MMM yyyy HH:mm')}"
+          >expiry date</span
+        >.
+      </p>
+
+      <p>
+        If you have any questions about your new role, please contact the
+        administrator.
+      </p>
+
+      <p>Best regards,<br />The ShopSphere Team</p>
+    </div>
+    <div class="footer">
+      <p>&copy; 2023 ShopSphere. All rights reserved.</p>
+    </div>
+  </body>
+</html>

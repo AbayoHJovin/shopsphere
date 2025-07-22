@@ -2,7 +2,10 @@ package com.shopsphere.shopsphere.enums;
 
 public enum OrderStatus {
     PENDING,
-    DELIVERING,
+    PROCESSING,
+    SHIPPED,
     DELIVERED,
-    CANCELLED
+    CANCELLED,
+    RETURNED,
+    PROVEN_DELIVERED
 }

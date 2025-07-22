@@ -25,8 +25,10 @@ public class ProductImage {
     private String imageUrl;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean isMain = false;
 
     @Column(nullable = false)
+    @Builder.Default
     private Integer position = 0;
 }

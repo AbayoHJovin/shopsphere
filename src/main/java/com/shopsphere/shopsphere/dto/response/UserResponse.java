@@ -14,11 +14,13 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UserResponse {
+
     private UUID userId;
     private String username;
     private String email;
     private Role role;
-    private String profilePicture;
+    private String profilePicture; // Changed from profilePictureUrl to match the method called in code
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedAt; // Added to match the User model and usage in code
+    private boolean active;
 }

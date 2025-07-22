@@ -30,15 +30,20 @@ public class Product {
 
     @Column(nullable = false)
     private BigDecimal price;
+    
+    @Column(name = "previous_price")
+    private BigDecimal previousPrice;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Gender gender;
 
     @Column(nullable = false)
+    @Builder.Default
     private Integer stock = 0;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean popular = false;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -52,6 +57,17 @@ public class Product {
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
     @Builder.Default
     private List<OrderItem> orderItems = new ArrayList<>();
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL)
+    @Builder.Default
+    private List<Rating> ratings = new ArrayList<>();
+
+    @Column(name = "average_rating")
+    private Double averageRating;
+
+    @Column(name = "rating_count")
+    @Builder.Default
+    private Integer ratingCount = 0;
 
     @ManyToMany
     @JoinTable(name = "product_categories", joinColumns = @JoinColumn(name = "product_id"), inverseJoinColumns = @JoinColumn(name = "category_id"))

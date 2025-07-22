@@ -8,17 +8,26 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, UUID> {
-    List<Order> findByOrderer(User orderer);
-
-    Page<Order> findByOrderer(User orderer, Pageable pageable);
-
-    Page<Order> findByOrderStatus(OrderStatus status, Pageable pageable);
-
-    Optional<Order> findByOrderCode(String orderCode);
+    
+    Page<Order> findByUser(User user, Pageable pageable);
+    
+    List<Order> findByUserIsNull();
+    
+    boolean existsByOrderCode(String orderCode);
+    
+    long countByOrderStatus(OrderStatus orderStatus);
+    
+    long countByOrderDateBetween(LocalDateTime startDate, LocalDateTime endDate);
+    
+    List<Order> findByOrderDateBetween(LocalDateTime startDate, LocalDateTime endDate);
+    
+    List<Order> findByHasUserProven(boolean hasUserProven);
+    
+    Page<Order> findByOrderStatus(OrderStatus orderStatus, Pageable pageable);
 }

@@ -1,5 +1,6 @@
 package com.shopsphere.shopsphere.models;
 
+import com.shopsphere.shopsphere.enums.OrderPaymentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -12,31 +13,38 @@ import java.util.UUID;
 @Entity
 @Table(name = "order_transactions")
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class OrderTransaction {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
     @Column(name = "transaction_id", updatable = false, nullable = false)
     private UUID transactionId;
 
     @OneToOne
-    @JoinColumn(name = "order_id", unique = true, nullable = false)
+    @JoinColumn(name = "order_id", nullable = false)
     private Order order;
 
-    @Column(nullable = false, length = 15)
-    private String phoneNo;
-
-    @Column(nullable = false, precision = 10, scale = 2)
+    @Column(nullable = false)
     private BigDecimal amount;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false)
     private String paymentMethod;
 
-    @CreationTimestamp
+    @Column(nullable = false, unique = true)
+    private String transactionReference;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private OrderPaymentStatus status;
+
     @Column(nullable = false)
     private LocalDateTime transactionDate;
 
-    private String transactionUrl;
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
 }

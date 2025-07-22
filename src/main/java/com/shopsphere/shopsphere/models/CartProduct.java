@@ -29,5 +29,6 @@ public class CartProduct {
     private Product product;
 
     @Column(nullable = false)
+    @Builder.Default
     private Integer quantity = 1;
 }

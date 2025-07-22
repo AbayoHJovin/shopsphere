@@ -65,7 +65,7 @@ public class AuthController {
                     .email(email)
                     .password(password)
                     .build();
-
+ 
             // Upload image to Cloudinary if provided
             if (image != null && !image.isEmpty()) {
                 Map<String, String> uploadResult = cloudinaryService.uploadImage(image);

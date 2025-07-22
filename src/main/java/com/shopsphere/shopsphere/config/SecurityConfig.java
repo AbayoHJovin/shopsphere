@@ -5,6 +5,7 @@ import com.shopsphere.shopsphere.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -38,8 +39,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
                         .requestMatchers("/error").permitAll()
-                        .requestMatchers("/api/profile/**").authenticated() // Protect profile endpoints
+                        .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "CO_WORKER")
+                        .requestMatchers("/api/co-worker/**").hasAnyRole("ADMIN", "CO_WORKER")
+                        .requestMatchers("/api/profile/**").authenticated()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))

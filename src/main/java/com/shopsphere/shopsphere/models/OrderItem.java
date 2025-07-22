@@ -2,32 +2,42 @@ package com.shopsphere.shopsphere.models;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.GenericGenerator;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "order_items", uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "order_id", "product_id" })
-})
+@Table(name = "order_items")
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class OrderItem {
+    
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "id", updatable = false, nullable = false)
-    private UUID id;
-
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column(name = "order_item_id", updatable = false, nullable = false)
+    private UUID orderItemId;
+    
     @ManyToOne
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
-
+    
     @ManyToOne
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
-
+    
     @Column(nullable = false)
-    private Integer quantity = 1;
+    private Integer quantity;
+    
+    @Column(nullable = false)
+    private BigDecimal price;
+    
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
 }

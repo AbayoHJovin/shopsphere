@@ -15,46 +15,42 @@ import java.util.UUID;
 @Entity
 @Table(name = "users")
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 @Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class User {
+
     @Id
     @GeneratedValue(generator = "UUID")
     @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
     @Column(name = "user_id", updatable = false, nullable = false)
     private UUID userId;
 
-    @Column(nullable = false, length = 255)
-    private String username;
-
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false)
+    private String username;
+
+    @Column(nullable = false)
     private String password;
-
-    @Column(length = 10)
-    private String otp;
-
-    @CreationTimestamp
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    private LocalDateTime updatedAt;
-
-    private String profilePicture;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
 
-    @OneToOne(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Cart cart;
+    private String profilePicture;
 
-    @OneToMany(mappedBy = "orderer", cascade = CascadeType.ALL)
+    @Column(nullable = false)
     @Builder.Default
-    private List<Order> orders = new ArrayList<>();
+    private boolean active = true;
+
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -62,4 +58,8 @@ public class User {
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private ResetPasswordToken resetPasswordToken;
+    
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @Builder.Default
+    private List<Rating> ratings = new ArrayList<>();
 }
