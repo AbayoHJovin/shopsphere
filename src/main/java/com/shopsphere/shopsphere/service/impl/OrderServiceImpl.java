@@ -1,5 +1,7 @@
 package com.shopsphere.shopsphere.service.impl;
 
+import com.shopsphere.shopsphere.dto.request.CardPaymentRequest;
+import com.shopsphere.shopsphere.dto.request.MomoPaymentRequest;
 import com.shopsphere.shopsphere.dto.request.OrderCreateRequest;
 import com.shopsphere.shopsphere.dto.request.OrderFilterRequest;
 import com.shopsphere.shopsphere.dto.request.OrderItemRequest;
@@ -9,11 +11,14 @@ import com.shopsphere.shopsphere.dto.request.QrScanRequest;
 import com.shopsphere.shopsphere.dto.response.OrderItemResponse;
 import com.shopsphere.shopsphere.dto.response.OrderResponse;
 import com.shopsphere.shopsphere.dto.response.OrderTransactionResponse;
+import com.shopsphere.shopsphere.dto.response.PaymentResponse;
 import com.shopsphere.shopsphere.dto.response.UserSummaryResponse;
 import com.shopsphere.shopsphere.enums.OrderPaymentStatus;
 import com.shopsphere.shopsphere.enums.OrderStatus;
+import com.shopsphere.shopsphere.enums.PaymentStatus;
 import com.shopsphere.shopsphere.enums.Role;
 import com.shopsphere.shopsphere.exception.ResourceNotFoundException;
+import com.shopsphere.shopsphere.models.Discount;
 import com.shopsphere.shopsphere.models.Order;
 import com.shopsphere.shopsphere.models.OrderItem;
 import com.shopsphere.shopsphere.models.OrderTransaction;
@@ -26,6 +31,7 @@ import com.shopsphere.shopsphere.repository.OrderTransactionRepository;
 import com.shopsphere.shopsphere.repository.ProductRepository;
 import com.shopsphere.shopsphere.repository.UserRepository;
 import com.shopsphere.shopsphere.service.OrderService;
+import com.shopsphere.shopsphere.service.PaymentService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.TypedQuery;
@@ -62,6 +68,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderTransactionRepository orderTransactionRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final PaymentService paymentService;
     private final PasswordEncoder passwordEncoder;
     
     @PersistenceContext
@@ -69,6 +76,148 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public OrderResponse processOrderWithPayment(OrderCreateRequest request, String userEmail) {
+        log.info("Processing order with payment for user: {}", userEmail);
+        
+        // Validate user
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        
+        // Validate products and verify pricing
+        validateOrderItems(request.getItems());
+        
+        // Process payment based on payment method
+        PaymentResponse paymentResponse;
+        try {
+            if (request.getPaymentMethod().getType().equals("credit_card")) {
+                // Process credit card payment
+                CardPaymentRequest paymentRequest = buildCardPaymentRequest(request, userEmail);
+                paymentResponse = paymentService.processCardPayment(paymentRequest);
+            } else if (request.getPaymentMethod().getType().equals("mtn_momo")) {
+                // Process mobile money payment
+                MomoPaymentRequest paymentRequest = buildMomoPaymentRequest(request, userEmail);
+                paymentResponse = paymentService.processMomoPayment(paymentRequest);
+            } else {
+                throw new IllegalArgumentException("Unsupported payment method: " + request.getPaymentMethod().getType());
+            }
+            
+            if (paymentResponse.getStatus() != PaymentStatus.COMPLETED && paymentResponse.getStatus() != PaymentStatus.PENDING) {
+                throw new IllegalStateException("Payment failed: " + paymentResponse.getErrorMessage());
+            }
+        } catch (Exception e) {
+            log.error("Payment processing error", e);
+            throw new IllegalStateException("Payment processing failed: " + e.getMessage());
+        }
+        
+        // Create order after successful payment
+        OrderResponse orderResponse = createOrder(request, userEmail);
+        
+        return orderResponse;
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse processGuestOrderWithPayment(OrderCreateRequest request) {
+        log.info("Processing guest order with payment");
+        
+        // Validate products and verify pricing
+        validateOrderItems(request.getItems());
+        
+        // Process payment based on payment method
+        PaymentResponse paymentResponse;
+        try {
+            if (request.getPaymentMethod().getType().equals("credit_card")) {
+                // Process credit card payment
+                CardPaymentRequest paymentRequest = buildCardPaymentRequest(request, request.getEmail());
+                paymentResponse = paymentService.processCardPayment(paymentRequest);
+            } else if (request.getPaymentMethod().getType().equals("mtn_momo")) {
+                // Process mobile money payment
+                MomoPaymentRequest paymentRequest = buildMomoPaymentRequest(request, request.getEmail());
+                paymentResponse = paymentService.processMomoPayment(paymentRequest);
+            } else {
+                throw new IllegalArgumentException("Unsupported payment method: " + request.getPaymentMethod().getType());
+            }
+            
+            if (paymentResponse.getStatus() != PaymentStatus.COMPLETED && paymentResponse.getStatus() != PaymentStatus.PENDING) {
+                throw new IllegalStateException("Payment failed: " + paymentResponse.getErrorMessage());
+            }
+        } catch (Exception e) {
+            log.error("Payment processing error", e);
+            throw new IllegalStateException("Payment processing failed: " + e.getMessage());
+        }
+        
+        // Create guest order after successful payment
+        OrderResponse orderResponse = createGuestOrder(request);
+        
+        return orderResponse;
+    }
+
+    private void validateOrderItems(List<OrderItemRequest> items) {
+        log.info("Validating order items and prices");
+        BigDecimal calculatedTotal = BigDecimal.ZERO;
+        
+        for (OrderItemRequest item : items) {
+            Product product = productRepository.findById(item.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + item.getProductId()));
+            
+            // Check if product has enough stock
+            if (product.getStock() < item.getQuantity()) {
+                throw new IllegalArgumentException("Not enough stock for product: " + product.getName());
+            }
+            
+            // Verify price is correct
+            BigDecimal currentPrice = getCurrentProductPrice(product);
+            if (item.getPrice().compareTo(currentPrice) != 0) {
+                throw new IllegalArgumentException("Price mismatch for product: " + product.getName() + 
+                        ". Expected: " + currentPrice + ", Got: " + item.getPrice());
+            }
+            
+            // Calculate subtotal
+            calculatedTotal = calculatedTotal.add(currentPrice.multiply(BigDecimal.valueOf(item.getQuantity())));
+        }
+    }
+    
+    private BigDecimal getCurrentProductPrice(Product product) {
+        // Check if there are any active discounts
+        Optional<Discount> activeDiscount = product.getDiscounts().stream()
+                .filter(Discount::isActive)
+                .findFirst();
+        
+        if (activeDiscount.isPresent()) {
+            // Apply discount
+            BigDecimal discountAmount = product.getPrice()
+                    .multiply(activeDiscount.get().getPercentage())
+                    .divide(BigDecimal.valueOf(100));
+            return product.getPrice().subtract(discountAmount);
+        }
+        
+        // Return regular price
+        return product.getPrice();
+    }
+    
+    private CardPaymentRequest buildCardPaymentRequest(OrderCreateRequest request, String customerEmail) {
+        return CardPaymentRequest.builder()
+                .paymentMethodId(request.getPaymentMethod().getCardNumber())
+                .amount(request.getTotalAmount())
+                .currency("USD")
+                .customerEmail(customerEmail)
+                .description("Payment for order")
+                .receiptEmail(customerEmail)
+                .build();
+    }
+    
+    private MomoPaymentRequest buildMomoPaymentRequest(OrderCreateRequest request, String customerEmail) {
+        return MomoPaymentRequest.builder()
+                .amount(request.getTotalAmount())
+                .mobileNumber(request.getPaymentMethod().getMobileNumber())
+                .currency("EUR") // MTN MoMo uses EUR as currency
+                .customerEmail(customerEmail)
+                .description("Payment for order")
+                .orderId(null) // Will be set after order creation
+                .build();
+    }
+    
+    @Override
     public OrderResponse createOrder(OrderCreateRequest request, String userEmail) {
         log.info("Creating order for user: {}", userEmail);
         
@@ -108,7 +257,6 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse createGuestOrder(OrderCreateRequest request) {
-        log.info("Creating guest order");
         
         // Generate unique order code
         String uniqueOrderCode = UUID.randomUUID().toString();

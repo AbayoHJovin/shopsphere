@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,7 +29,6 @@ public class ProductCreateRequest {
     @Min(value = 0, message = "Price must be greater than or equal to 0")
     private BigDecimal price;
 
-    @NotNull(message = "Gender is required")
     private Gender gender;
 
     @Min(value = 0, message = "Stock must be greater than or equal to 0")
@@ -38,6 +38,12 @@ public class ProductCreateRequest {
     @Builder.Default
     private Boolean popular = false;
 
-    @NotNull(message = "At least one category is required")
-    private List<UUID> categoryIds;
+    @Builder.Default
+    private List<UUID> colorIds = new ArrayList<>();
+    
+    @Builder.Default
+    private List<ProductSizeRequest> sizes = new ArrayList<>();
+
+    @Builder.Default
+    private List<UUID> categoryIds = new ArrayList<>();
 }

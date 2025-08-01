@@ -23,4 +23,6 @@ public class ProductSummaryResponse {
     private int stock;
     private Double averageRating;
     private Integer ratingCount;
+    private Integer colorCount; // Number of available colors
+    private Integer sizeCount;  // Number of available sizes
 }

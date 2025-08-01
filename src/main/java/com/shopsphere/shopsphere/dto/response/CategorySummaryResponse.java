@@ -17,5 +17,5 @@ public class CategorySummaryResponse {
     private Integer productCount;
     private Boolean hasSubcategories;
     private Long totalSold; // Added for admin dashboard usage
-    private Double percentageOfTotalSales; // Added for admin dashboard usage
+    private Double percentageOfTotalSales; // Added for admin dashboard usagelog
 }

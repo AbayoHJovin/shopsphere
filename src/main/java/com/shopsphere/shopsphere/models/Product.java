@@ -35,7 +35,7 @@ public class Product {
     private BigDecimal previousPrice;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = true)
     private Gender gender;
 
     @Column(nullable = false)
@@ -45,6 +45,21 @@ public class Product {
     @Column(nullable = false)
     @Builder.Default
     private Boolean popular = false;
+    
+    // Available colors for this product
+    @ManyToMany
+    @JoinTable(
+        name = "product_colors_mapping", 
+        joinColumns = @JoinColumn(name = "product_id"), 
+        inverseJoinColumns = @JoinColumn(name = "color_id")
+    )
+    @Builder.Default
+    private List<ProductColor> colors = new ArrayList<>();
+    
+    // Available sizes for this product
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ProductSize> sizes = new ArrayList<>();
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
@@ -77,4 +92,23 @@ public class Product {
     @ManyToMany(mappedBy = "products")
     @Builder.Default
     private List<Discount> discounts = new ArrayList<>();
+    
+    // Helper methods
+    public void addColor(ProductColor color) {
+        colors.add(color);
+    }
+    
+    public void removeColor(ProductColor color) {
+        colors.remove(color);
+    }
+    
+    public void addSize(ProductSize size) {
+        sizes.add(size);
+        size.setProduct(this);
+    }
+    
+    public void removeSize(ProductSize size) {
+        sizes.remove(size);
+        size.setProduct(null);
+    }
 }

@@ -14,6 +14,8 @@ import com.shopsphere.shopsphere.repository.CategoryRepository;
 import com.shopsphere.shopsphere.repository.ProductImageRepository;
 import com.shopsphere.shopsphere.repository.ProductRepository;
 import com.shopsphere.shopsphere.repository.DiscountRepository;
+import com.shopsphere.shopsphere.repository.ProductColorRepository;
+import com.shopsphere.shopsphere.repository.ProductSizeRepository;
 import com.shopsphere.shopsphere.service.CloudinaryService;
 import com.shopsphere.shopsphere.service.ProductService;
 import jakarta.transaction.Transactional;
@@ -41,6 +43,12 @@ import com.shopsphere.shopsphere.models.Discount;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import com.shopsphere.shopsphere.dto.request.ProductColorRequest;
+import com.shopsphere.shopsphere.dto.request.ProductSizeRequest;
+import com.shopsphere.shopsphere.dto.response.ProductColorResponse;
+import com.shopsphere.shopsphere.dto.response.ProductSizeResponse;
+import com.shopsphere.shopsphere.models.ProductColor;
+import com.shopsphere.shopsphere.models.ProductSize;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +58,8 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final ProductImageRepository productImageRepository;
+    private final ProductColorRepository productColorRepository;
+    private final ProductSizeRepository productSizeRepository;
     private final CloudinaryService cloudinaryService;
     private final DiscountRepository discountRepository;
 
@@ -69,7 +79,7 @@ public class ProductServiceImpl implements ProductService {
                 .name(request.getName())
                 .description(request.getDescription())
                 .price(request.getPrice())
-                .gender(request.getGender())
+                .gender(request.getGender()) // Gender is now optional
                 .stock(request.getStock())
                 .popular(request.getPopular())
                 .categories(categories)
@@ -78,6 +88,16 @@ public class ProductServiceImpl implements ProductService {
 
         // Save product to get an ID
         Product savedProduct = productRepository.save(product);
+        
+        // Add colors if provided
+        if (request.getColorIds() != null && !request.getColorIds().isEmpty()) {
+            addProductColors(savedProduct, request.getColorIds());
+        }
+        
+        // Add sizes if provided
+        if (request.getSizes() != null && !request.getSizes().isEmpty()) {
+            addProductSizes(savedProduct, request.getSizes());
+        }
 
         // Upload images in parallel if provided
         if (images != null && !images.isEmpty()) {
@@ -128,6 +148,26 @@ public class ProductServiceImpl implements ProductService {
         if (request.getCategoryIds() != null && !request.getCategoryIds().isEmpty()) {
             List<Category> categories = getCategoriesFromIds(request.getCategoryIds());
             product.setCategories(categories);
+        }
+        
+        // Update colors if provided
+        if (request.getColorIds() != null) {
+            // Remove existing colors
+            product.getColors().clear();
+            // Add new colors
+            if (!request.getColorIds().isEmpty()) {
+                addProductColors(product, request.getColorIds());
+            }
+        }
+        
+        // Update sizes if provided
+        if (request.getSizes() != null) {
+            // Remove existing sizes
+            product.getSizes().clear();
+            // Add new sizes
+            if (!request.getSizes().isEmpty()) {
+                addProductSizes(product, request.getSizes());
+            }
         }
 
         Product updatedProduct = productRepository.save(product);
@@ -189,6 +229,8 @@ public class ProductServiceImpl implements ProductService {
                 // Continue with deletion even if image deletion fails
             }
         }
+        
+        // Colors and sizes will be deleted automatically due to CascadeType.ALL and orphanRemoval = true
 
         // Delete product from database
         productRepository.delete(product);
@@ -391,51 +433,54 @@ public class ProductServiceImpl implements ProductService {
 
     // Helper methods
     private List<Category> getCategoriesFromIds(List<UUID> categoryIds) {
+        if (categoryIds == null || categoryIds.isEmpty()) {
+            return new ArrayList<>();
+        }
         return categoryIds.stream()
                 .map(id -> categoryRepository.findById(id)
                         .orElseThrow(() -> new ResourceNotFoundException("Category not found with ID: " + id)))
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     private void uploadProductImages(Product product, List<MultipartFile> images) {
         // Check if there are any existing images
         boolean hasExistingImages = !product.getImages().isEmpty();
 
-        // Process images in parallel using CompletableFuture
-        List<CompletableFuture<ProductImage>> futures = new ArrayList<>();
+        // Make sure the product is properly saved and attached to the persistence context
+        Product refreshedProduct = productRepository.findById(product.getProductId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + product.getProductId()));
 
+        // Process images sequentially to avoid transaction issues
         for (int i = 0; i < images.size(); i++) {
             final int position = i;
             final boolean isMain = !hasExistingImages && position == 0; // First image is main if no existing images
 
             MultipartFile imageFile = images.get(i);
 
-            CompletableFuture<ProductImage> future = CompletableFuture.supplyAsync(() -> {
-                try {
-                    // Upload to Cloudinary
-                    Map<String, String> uploadResult = cloudinaryService.uploadImage(imageFile);
-                    String imageUrl = uploadResult.get("secure_url");
+            try {
+                // Upload to Cloudinary
+                Map<String, String> uploadResult = cloudinaryService.uploadImage(imageFile);
+                String imageUrl = uploadResult.get("secure_url");
 
-                    // Create and save ProductImage entity
-                    ProductImage productImage = ProductImage.builder()
-                            .product(product)
-                            .imageUrl(imageUrl)
-                            .isMain(isMain)
-                            .position(position)
-                            .build();
+                // Create and save ProductImage entity
+                ProductImage productImage = ProductImage.builder()
+                        .product(refreshedProduct)
+                        .imageUrl(imageUrl)
+                        .isMain(isMain)
+                        .position(position)
+                        .build();
 
-                    return productImageRepository.save(productImage);
-                } catch (IOException e) {
-                    log.error("Failed to upload image to Cloudinary", e);
-                    throw new RuntimeException("Failed to upload image", e);
-                }
-            }, imageUploadExecutor);
-
-            futures.add(future);
+                ProductImage savedImage = productImageRepository.save(productImage);
+                refreshedProduct.getImages().add(savedImage);
+            } catch (IOException e) {
+                log.error("Failed to upload image to Cloudinary", e);
+                throw new RuntimeException("Failed to upload image", e);
+            }
         }
 
-        // Wait for all uploads to complete
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        // Save the product with its new images
+        productRepository.save(refreshedProduct);
     }
 
     private ProductResponse mapProductToResponse(Product product) {
@@ -507,6 +552,24 @@ public class ProductServiceImpl implements ProductService {
                     .setScale(2, RoundingMode.HALF_UP);
         }
         
+        // Map colors to response objects
+        List<ProductColorResponse> colorResponses = product.getColors().stream()
+                .map(color -> ProductColorResponse.builder()
+                        .colorId(color.getColorId())
+                        .colorName(color.getColorName())
+                        .colorHexCode(color.getColorHexCode())
+                        .build())
+                .collect(Collectors.toList());
+        
+        // Map sizes to response objects
+        List<ProductSizeResponse> sizeResponses = product.getSizes().stream()
+                .map(size -> ProductSizeResponse.builder()
+                        .sizeId(size.getSizeId())
+                        .size(size.getSize())
+                        .stockForSize(size.getStockForSize())
+                        .build())
+                .collect(Collectors.toList());
+        
         return ProductResponse.builder()
                 .productId(product.getProductId())
                 .name(product.getName())
@@ -521,10 +584,43 @@ public class ProductServiceImpl implements ProductService {
                 .mainImage(mainImageUrl)
                 .averageRating(product.getAverageRating())
                 .ratingCount(product.getRatingCount())
+                .colors(colorResponses)
+                .sizes(sizeResponses)
                 .discounts(discountResponses)
                 .activeDiscount(activeDiscount)
                 .discountedPrice(discountedPrice)
                 .onSale(activeDiscount != null)
                 .build();
+    }
+    
+    // Helper methods for colors and sizes
+    private void addProductColors(Product product, List<UUID> colorIds) {
+        if (colorIds == null || colorIds.isEmpty()) {
+            return;
+        }
+        
+        List<ProductColor> colors = productColorRepository.findByColorIdIn(colorIds);
+        
+        // Check if all requested colors were found
+        if (colors.size() != colorIds.size()) {
+            log.warn("Not all requested colors were found. Requested: {}, Found: {}", colorIds.size(), colors.size());
+        }
+        
+        // Add each color to the product
+        for (ProductColor color : colors) {
+            product.addColor(color);
+        }
+    }
+    
+    private void addProductSizes(Product product, List<ProductSizeRequest> sizeRequests) {
+        for (ProductSizeRequest sizeRequest : sizeRequests) {
+            ProductSize size = ProductSize.builder()
+                    .size(sizeRequest.getSize())
+                    .stockForSize(sizeRequest.getStockForSize())
+                    .product(product)
+                    .build();
+            
+            product.addSize(size);
+        }
     }
 }

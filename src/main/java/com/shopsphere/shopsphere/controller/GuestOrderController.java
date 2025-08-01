@@ -22,12 +22,27 @@ public class GuestOrderController {
 
     private final OrderService orderService;
 
+    /**
+     * @deprecated Use {@link CheckoutController#processGuestOrderWithPayment} instead.
+     * This endpoint does not support payment processing.
+     */
+    @Deprecated
     @PostMapping
     public ResponseEntity<?> createGuestOrder(
             @Valid @RequestBody OrderCreateRequest request,
             HttpServletRequest servletRequest) {
         try {
-            log.info("Creating guest order");
+            log.info("Creating guest order using deprecated endpoint");
+            log.warn("This endpoint is deprecated. Please use /api/checkout/guest/complete instead, which includes payment processing.");
+            
+            // Check if payment method is included
+            if (request.getPaymentMethod() != null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ErrorResponse.of(HttpStatus.BAD_REQUEST,
+                                "This endpoint does not support payment processing. Please use /api/checkout/guest/complete instead.",
+                                servletRequest.getRequestURI()));
+            }
+            
             OrderResponse response = orderService.createGuestOrder(request);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (IllegalArgumentException e) {

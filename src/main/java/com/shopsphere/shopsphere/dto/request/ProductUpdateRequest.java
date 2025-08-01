@@ -30,5 +30,11 @@ public class ProductUpdateRequest {
 
     private Boolean popular;
 
+    @Builder.Default
+    private List<UUID> colorIds = null;
+    
+    @Builder.Default
+    private List<ProductSizeRequest> sizes = null;
+    
     private List<UUID> categoryIds;
 }

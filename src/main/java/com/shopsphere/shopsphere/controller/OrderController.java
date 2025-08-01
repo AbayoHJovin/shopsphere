@@ -33,6 +33,11 @@ public class OrderController {
 
     private final OrderService orderService;
 
+    /**
+     * @deprecated Use {@link CheckoutController#processOrderWithPayment} instead.
+     * This endpoint does not support payment processing.
+     */
+    @Deprecated
     @PostMapping
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<?> createOrder(
@@ -40,7 +45,17 @@ public class OrderController {
             Authentication authentication,
             HttpServletRequest servletRequest) {
         try {
-            log.info("Creating order for authenticated user");
+            log.info("Creating order for authenticated user using deprecated endpoint");
+            log.warn("This endpoint is deprecated. Please use /api/checkout/complete instead, which includes payment processing.");
+            
+            // Check if payment method is included
+            if (request.getPaymentMethod() != null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ErrorResponse.of(HttpStatus.BAD_REQUEST,
+                                "This endpoint does not support payment processing. Please use /api/checkout/complete instead.",
+                                servletRequest.getRequestURI()));
+            }
+            
             String userEmail = authentication.getName();
             OrderResponse response = orderService.createOrder(request, userEmail);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);

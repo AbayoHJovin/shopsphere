@@ -158,4 +158,35 @@ public class AdminOrderController {
                             servletRequest.getRequestURI()));
         }
     }
-} 
+    
+    @GetMapping("/{orderId}")
+    public ResponseEntity<?> getOrderById(
+            @PathVariable UUID orderId,
+            Authentication authentication,
+            HttpServletRequest servletRequest) {
+        try {
+            log.info("Admin: Fetching order with ID: {}", orderId);
+            String userEmail = authentication.getName();
+            OrderResponse response = orderService.getOrderById(orderId, userEmail);
+            return ResponseEntity.ok(response);
+        } catch (ResourceNotFoundException e) {
+            log.error("Order not found", e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ErrorResponse.of(HttpStatus.NOT_FOUND,
+                            e.getMessage(),
+                            servletRequest.getRequestURI()));
+        } catch (AccessDeniedException e) {
+            log.error("Access denied", e);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ErrorResponse.of(HttpStatus.FORBIDDEN,
+                            e.getMessage(),
+                            servletRequest.getRequestURI()));
+        } catch (Exception e) {
+            log.error("Error fetching order", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ErrorResponse.of(HttpStatus.INTERNAL_SERVER_ERROR,
+                            "Error fetching order: " + e.getMessage(),
+                            servletRequest.getRequestURI()));
+        }
+    }
+}

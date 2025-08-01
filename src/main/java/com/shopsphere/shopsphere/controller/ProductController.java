@@ -1,11 +1,12 @@
 package com.shopsphere.shopsphere.controller;
 
 import com.shopsphere.shopsphere.dto.request.ProductCreateRequest;
-import com.shopsphere.shopsphere.dto.request.ProductUpdateRequest;
 import com.shopsphere.shopsphere.dto.request.ProductSearchFilterRequest;
+import com.shopsphere.shopsphere.dto.request.ProductUpdateRequest;
 import com.shopsphere.shopsphere.dto.response.ErrorResponse;
 import com.shopsphere.shopsphere.dto.response.MessageResponse;
 import com.shopsphere.shopsphere.dto.response.ProductResponse;
+import com.shopsphere.shopsphere.enums.Gender;
 import com.shopsphere.shopsphere.exception.ResourceNotFoundException;
 import com.shopsphere.shopsphere.service.ProductService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +24,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,11 +40,35 @@ public class ProductController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN', 'CO_WORKER')")
     public ResponseEntity<?> createProduct(
-            @RequestPart("product") @Valid ProductCreateRequest request,
+            @RequestParam("name") String name,
+            @RequestParam("description") String description,
+            @RequestParam("price") BigDecimal price,
+            @RequestParam(value = "stock", defaultValue = "0") Integer stock,
+            @RequestParam(value = "gender", required = false) Gender gender,
+            @RequestParam(value = "popularity", defaultValue = "false") Boolean popular,
+            @RequestParam(value = "categories", required = false) List<UUID> categoryIds,
+            @RequestParam(value = "colors", required = false) List<UUID> colorIds,
             @RequestPart(value = "images", required = false) List<MultipartFile> images,
             HttpServletRequest servletRequest) {
         try {
-            log.info("Creating new product: {}", request.getName());
+            log.info("Creating new product: {}", name);
+            
+            // Build ProductCreateRequest from individual parameters
+            ProductCreateRequest request = ProductCreateRequest.builder()
+                .name(name)
+                .description(description)
+                .price(price)
+                .stock(stock)
+                .popular(popular)
+                .categoryIds(categoryIds != null ? categoryIds : new ArrayList<>())
+                .colorIds(colorIds != null ? colorIds : new ArrayList<>())
+                .build();
+                
+            // Set gender if provided
+            if (gender != null) {
+                request.setGender(gender);
+            }
+            
             ProductResponse response = productService.createProduct(request, images);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (Exception e) {
@@ -53,15 +80,67 @@ public class ProductController {
         }
     }
 
-    @PutMapping("/{productId}")
+    @PutMapping(value = "/{productId}", consumes = MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN', 'CO_WORKER')")
-    public ResponseEntity<?> updateProduct(
+    public ResponseEntity<?> updateProductJson(
             @PathVariable UUID productId,
             @Valid @RequestBody ProductUpdateRequest request,
             HttpServletRequest servletRequest) {
         try {
             log.info("Updating product with ID: {}", productId);
             ProductResponse response = productService.updateProduct(productId, request);
+            return ResponseEntity.ok(response);
+        } catch (ResourceNotFoundException e) {
+            log.error("Product not found", e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(ErrorResponse.of(HttpStatus.NOT_FOUND,
+                            e.getMessage(),
+                            servletRequest.getRequestURI()));
+        } catch (Exception e) {
+            log.error("Error updating product", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ErrorResponse.of(HttpStatus.INTERNAL_SERVER_ERROR,
+                            "Error updating product: " + e.getMessage(),
+                            servletRequest.getRequestURI()));
+        }
+    }
+    
+    @PutMapping(value = "/{productId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'CO_WORKER')")
+    public ResponseEntity<?> updateProduct(
+            @PathVariable UUID productId,
+            @RequestParam("name") String name,
+            @RequestParam("description") String description,
+            @RequestParam("price") BigDecimal price,
+            @RequestParam(value = "stock", defaultValue = "0") Integer stock,
+            @RequestParam(value = "gender", required = false) Gender gender,
+            @RequestParam(value = "popularity", required = false) Boolean popular,
+            @RequestParam(value = "categories", required = false) List<UUID> categoryIds,
+            @RequestParam(value = "colors", required = false) List<UUID> colorIds,
+            @RequestParam(value = "previousPrice", required = false) BigDecimal previousPrice,
+            HttpServletRequest servletRequest) {
+        try {
+            log.info("Updating product with ID: {} using multipart form data", productId);
+            
+            // Build ProductUpdateRequest from individual parameters
+            ProductUpdateRequest request = ProductUpdateRequest.builder()
+                .name(name)
+                .description(description)
+                .price(price)
+                .stock(stock)
+                .popular(popular) // Using 'popularity' from frontend as 'popular' in backend
+                .categoryIds(categoryIds != null ? categoryIds : new ArrayList<>())
+                .colorIds(colorIds != null ? colorIds : new ArrayList<>())
+                .build();
+                
+            // Set gender if provided
+            if (gender != null) {
+                request.setGender(gender);
+            }
+            
+            // Update the product details
+            ProductResponse response = productService.updateProduct(productId, request);
+            
             return ResponseEntity.ok(response);
         } catch (ResourceNotFoundException e) {
             log.error("Product not found", e);

@@ -23,7 +23,7 @@ import java.util.UUID;
 @RequestMapping("/api/admin/categories")
 @RequiredArgsConstructor
 @Slf4j
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'CO_WORKER')")
 public class AdminCategoryController {
 
     private final CategoryService categoryService;

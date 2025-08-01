@@ -30,6 +30,10 @@ public class ProductResponse {
     private Integer ratingCount;
     private List<RatingResponse> topRatings;
     
+    // Color and size options
+    private List<ProductColorResponse> colors;
+    private List<ProductSizeResponse> sizes;
+    
     // Discount information
     private List<ProductDiscountResponse> discounts;
     private ProductDiscountResponse activeDiscount; // Currently active discount if any

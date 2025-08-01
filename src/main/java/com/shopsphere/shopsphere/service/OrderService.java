@@ -6,6 +6,7 @@ import com.shopsphere.shopsphere.dto.request.OrderProveDeliveryRequest;
 import com.shopsphere.shopsphere.dto.request.OrderStatusUpdateRequest;
 import com.shopsphere.shopsphere.dto.request.QrScanRequest;
 import com.shopsphere.shopsphere.dto.response.OrderResponse;
+import com.shopsphere.shopsphere.dto.response.PaymentResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -13,10 +14,22 @@ import java.util.UUID;
 
 public interface OrderService {
 
-    // Create order
+    /**
+     * Create and process an order with payment for authenticated user
+     * This method handles both payment processing and order creation
+     */
+    OrderResponse processOrderWithPayment(OrderCreateRequest request, String userEmail);
+
+    /**
+     * Create and process an order with payment for guest user
+     * This method handles both payment processing and order creation
+     */
+    OrderResponse processGuestOrderWithPayment(OrderCreateRequest request);
+    
+    // Create order (after successful payment)
     OrderResponse createOrder(OrderCreateRequest request, String userEmail);
 
-    // Guest order creation
+    // Guest order creation (after successful payment)
     OrderResponse createGuestOrder(OrderCreateRequest request);
 
     // Get order by ID
